@@ -799,6 +799,11 @@ export interface paths {
          *     in a region. Price and validity are flat per region, so every result
          *     shows the same `monthly_rental_usd` and `validity_days`, and that is the
          *     exact amount a purchase will charge.
+         *
+         *     A region can have more than one carrier, each stocking different
+         *     number series. Pass the `carrier` you want; the response names the
+         *     carrier its results came from, and that is the carrier a purchase has
+         *     to pass.
          */
         get: operations["searchPhoneNumbers"];
         put?: never;
@@ -1415,10 +1420,14 @@ export interface paths {
         };
         /**
          * Get KYC status
-         * @description Get the identity verification status of a client for every region
-         *     where verification is required. Use `next_step` to know which step
-         *     to call next, so you drive the whole flow off one poll instead of
-         *     hardcoding the sequence.
+         * @description Get the identity verification status of a client for every carrier it
+         *     can verify on. Use `next_step` to know which step to call next, so
+         *     you drive the whole flow off one poll instead of hardcoding the
+         *     sequence.
+         *
+         *     Verification is per carrier, not per region: a client verified on one
+         *     carrier of a region still has to verify on the other before it can
+         *     buy there. A region with one carrier returns exactly one entry.
          */
         get: operations["getResellerKycStatus"];
         put?: never;
@@ -1438,9 +1447,15 @@ export interface paths {
         };
         /**
          * Get KYC requirements for a region
-         * @description Get the ordered list of verification steps for a region and
-         *     the fields each step needs, so your integration can build a
-         *     verification form without hardcoding the sequence.
+         * @description Get the ordered list of verification steps for a carrier and the
+         *     fields each step needs, so your integration can build a verification
+         *     form without hardcoding the sequence.
+         *
+         *     Carriers in the same region do not share a step list. One verifies
+         *     contact details with an OTP pair and ends in a preview-then-accept;
+         *     another has no OTP step at all and verifies Aadhaar by sending the
+         *     client to DigiLocker in a browser. Read this endpoint per carrier,
+         *     branch on each step's `method`, and one integration drives both.
          */
         get: operations["getResellerKycRequirements"];
         put?: never;
@@ -1464,8 +1479,13 @@ export interface paths {
          * Submit a KYC verification step
          * @description Run one step of a client's identity verification. One endpoint handles
          *     every step: the `step` path parameter names the step, and the body
-         *     carries `user_id`, `region`, and whatever that step needs. Pick a step
-         *     from the examples below to see its body.
+         *     carries `user_id`, `region`, `carrier`, and whatever that step needs.
+         *     Pick a step from the examples below to see its body.
+         *
+         *     Which steps exist, which fields they need, and how each one is
+         *     performed are all per carrier. Read them from the requirements
+         *     operation for the carrier you are on, follow `next_step`, and branch
+         *     on `method`.
          */
         post: operations["submitResellerKycStep"];
         delete?: never;
@@ -1495,6 +1515,47 @@ export interface components {
             error?: string;
             /** @description Human-readable explanation. */
             error_description?: string;
+        };
+        /**
+         * @description One carrier in a region: a network you can buy numbers from, with its
+         *     own stock and its own identity verification.
+         */
+        ShopCarrier: {
+            /**
+             * @description How you address this carrier. Stable across a rename, so it is safe to store.
+             * @example carrier-1
+             */
+            carrier?: string;
+            /**
+             * @description Display name for the carrier.
+             * @example Carrier 1
+             */
+            label?: string;
+            /**
+             * @description What this carrier stocks, so you can tell them apart.
+             * @example Landline numbers, 80 series.
+             */
+            description?: string;
+            /** @description Whether a client must complete this carrier's verification before buying on it. */
+            kyc_required?: boolean;
+            /**
+             * @description `true` while this carrier is not taking orders. It is still
+             *     named, so a stored name keeps resolving; buy on the other one
+             *     meanwhile.
+             */
+            unavailable?: boolean;
+            /** @description Short reason, when the carrier is unavailable. `null` otherwise. */
+            unavailable_note?: string | null;
+        };
+        CarrierRequiredError: components["schemas"]["SessionError"] & {
+            /** @enum {string} */
+            region?: "IN" | "US";
+            /**
+             * @description The carriers to choose from, each with what it stocks, so the
+             *     refusal carries its own fix and is where you discover the
+             *     names.
+             */
+            carriers?: components["schemas"]["ShopCarrier"][];
         };
         /**
          * @description Reseller-managed dashboard menu access flags. Each property is
@@ -6009,10 +6070,18 @@ export interface operations {
         parameters: {
             query: {
                 /**
-                 * @description Region to search in.
-                 * @example US
+                 * @description Region to search in. `IN` and `US` both serve numbers. Which
+                 *     regions answer is configuration, so a region with no carrier
+                 *     enabled returns `404 not_available` rather than an empty list.
+                 * @example IN
                  */
                 region: "IN" | "US";
+                /**
+                 * @description Which carrier to search. Optional while a region has one,
+                 *     required once it has two, and the refusal lists the names.
+                 * @example carrier-1
+                 */
+                carrier?: string;
                 /**
                  * @description Digits or prefix to match within the number.
                  * @example 555
@@ -6040,14 +6109,16 @@ export interface operations {
                     /**
                      * @example {
                      *       "success": true,
-                     *       "region": "US",
+                     *       "region": "IN",
+                     *       "carrier": "carrier-1",
+                     *       "carrier_label": "Carrier 1",
                      *       "numbers": [
                      *         {
-                     *           "phone_number": "+15551234567",
-                     *           "monthly_rental_usd": 5,
+                     *           "phone_number": "+918000000001",
+                     *           "monthly_rental_usd": 5.06,
                      *           "validity_days": 30,
-                     *           "region": "US",
-                     *           "kyc_required": false
+                     *           "region": "IN",
+                     *           "kyc_required": true
                      *         }
                      *       ],
                      *       "total": 1,
@@ -6060,6 +6131,10 @@ export interface operations {
                         success?: boolean;
                         /** @enum {string} */
                         region?: "IN" | "US";
+                        /** @description The carrier these results came from. Pass it to the purchase operation to buy one of them. */
+                        carrier?: string;
+                        /** @description Display name of that carrier. */
+                        carrier_label?: string;
                         numbers?: {
                             phone_number?: string;
                             /** @description Amount, in USD, that a purchase of this number will charge per month. */
@@ -6136,6 +6211,35 @@ export interface operations {
                     "application/json": components["schemas"]["SessionError"];
                 };
             };
+            /**
+             * @description This region has more than one carrier and the request named
+             *     none. The body lists the carriers to choose from.
+             */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "carrier_required",
+                     *       "error_description": "Region IN has more than one carrier and no default. Pass carrier=<name> with one of the carriers listed here.",
+                     *       "region": "IN",
+                     *       "carriers": [
+                     *         {
+                     *           "carrier": "carrier-1",
+                     *           "label": "Carrier 1",
+                     *           "description": "Landline numbers, 80 series.",
+                     *           "kyc_required": true,
+                     *           "unavailable": false,
+                     *           "unavailable_note": null
+                     *         }
+                     *       ]
+                     *     }
+                     */
+                    "application/json": components["schemas"]["CarrierRequiredError"];
+                };
+            };
             /** @description Unexpected server error. */
             500: {
                 headers: {
@@ -6176,8 +6280,9 @@ export interface operations {
             content: {
                 /**
                  * @example {
-                 *       "region": "US",
-                 *       "phone_number": "+15551234567"
+                 *       "region": "IN",
+                 *       "carrier": "carrier-1",
+                 *       "phone_number": "+918000000001"
                  *     }
                  */
                 "application/json": {
@@ -6191,6 +6296,12 @@ export interface operations {
                      * @example +15551234567
                      */
                     phone_number: string;
+                    /**
+                     * @description The carrier to buy from, as named by the search response.
+                     *     Optional while a region has one, required once it has two.
+                     * @example carrier-1
+                     */
+                    carrier?: string;
                     /** @description Reseller accounts only: the client to act on. Omit it to act on your own account. */
                     user_id?: number;
                 };
@@ -6300,22 +6411,17 @@ export interface operations {
                 };
             };
             /**
-             * @description The purchase was refused before anything was charged:
-             *     identity verification is not complete (`kyc_incomplete`),
-             *     an earlier purchase is still running (`in_progress`), or the
-             *     number was taken by someone else (`number_unavailable`).
+             * @description The purchase was refused before anything was charged: identity
+             *     verification is not complete (`kyc_incomplete`), an earlier
+             *     purchase is still running (`in_progress`), the number was taken by
+             *     someone else (`number_unavailable`), or the region has more than
+             *     one carrier and the request named none (`carrier_required`).
              */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    /**
-                     * @example {
-                     *       "error": "kyc_incomplete",
-                     *       "error_description": "Complete identity verification for this region first."
-                     *     }
-                     */
                     "application/json": components["schemas"]["SessionError"];
                 };
             };
@@ -9462,10 +9568,23 @@ export interface operations {
                      *       "regions": [
                      *         {
                      *           "region": "IN",
+                     *           "carrier": "carrier-1",
+                     *           "carrier_label": "Carrier 1",
                      *           "kyc_required": true,
                      *           "can_purchase": false,
                      *           "status": "pan_verified",
-                     *           "next_step": "aadhaar-otp"
+                     *           "next_step": "aadhaar-otp",
+                     *           "review_status": null
+                     *         },
+                     *         {
+                     *           "region": "IN",
+                     *           "carrier": "carrier-2-new",
+                     *           "carrier_label": "Carrier 2 (new)",
+                     *           "kyc_required": true,
+                     *           "can_purchase": false,
+                     *           "status": "not_started",
+                     *           "next_step": "register",
+                     *           "review_status": null
                      *         }
                      *       ]
                      *     }
@@ -9473,13 +9592,23 @@ export interface operations {
                     "application/json": {
                         success?: boolean;
                         user_id?: number;
-                        /** @description One entry per region, each with that region's verification state. */
+                        /** @description One entry per carrier, each with that carrier's verification state. */
                         regions?: {
                             /** @enum {string} */
                             region?: "IN" | "US";
+                            /**
+                             * @description The carrier this entry is about. Pass it to the verification calls and to a purchase.
+                             * @example carrier-1
+                             */
+                            carrier?: string;
+                            /**
+                             * @description Display name of that carrier.
+                             * @example Carrier 1
+                             */
+                            carrier_label?: string;
                             /** @description Whether this client must complete verification before buying a number in this region. */
                             kyc_required?: boolean;
-                            /** @description Whether this client can buy a number in this region right now. Always agrees with what a purchase attempt would allow. */
+                            /** @description Whether this client can buy a number on this carrier right now. Always agrees with what a purchase attempt would allow. */
                             can_purchase?: boolean;
                             /**
                              * @description Where this client has reached in verification.
@@ -9489,10 +9618,27 @@ export interface operations {
                              */
                             status?: string;
                             /**
-                             * @description The step to call next. `null` once `status` is `completed`.
-                             * @enum {string|null}
+                             * @description The step to call next, or `null` when there is
+                             *     nothing left for you to do.
+                             *
+                             *     Not a fixed list. Which steps exist depends on
+                             *     the carrier, and carriers do not run the same
+                             *     checks. Read the step list from
+                             *     `GET /reseller/kyc/requirements` for that carrier
+                             *     and follow this field; never hard-code the names.
+                             *
+                             *     `null` with `can_purchase: false` means the
+                             *     carrier is still reviewing the submission. See
+                             *     `review_status`.
                              */
-                            next_step?: "register" | "verify-otp" | "verify-pan" | "aadhaar-otp" | "aadhaar-verify" | "verify-gst" | "preview" | "accept" | null;
+                            next_step?: string | null;
+                            /**
+                             * @description Set when the carrier is holding a finished
+                             *     submission for its own review, which is why
+                             *     `can_purchase` can still be false with no step
+                             *     left to call. `null` otherwise.
+                             */
+                            review_status?: string | null;
                         }[];
                     };
                 };
@@ -9566,6 +9712,12 @@ export interface operations {
                  * @example IN
                  */
                 region: "IN" | "US";
+                /**
+                 * @description Which carrier's steps to return. Optional while a region has
+                 *     one, required once it has two, and the refusal lists the names.
+                 * @example carrier-1
+                 */
+                carrier?: string;
             };
             header?: never;
             path?: never;
@@ -9591,7 +9743,9 @@ export interface operations {
                      *             "name",
                      *             "phone"
                      *           ],
-                     *           "cooldown": false
+                     *           "cooldown": false,
+                     *           "choices": {},
+                     *           "method": "submit"
                      *         },
                      *         {
                      *           "step": "verify-otp",
@@ -9599,12 +9753,14 @@ export interface operations {
                      *             "email_otp",
                      *             "mobile_otp"
                      *           ],
-                     *           "cooldown": false
+                     *           "cooldown": false,
+                     *           "method": "submit"
                      *         },
                      *         {
                      *           "step": "resend-otp",
                      *           "required": [],
-                     *           "cooldown": false
+                     *           "cooldown": false,
+                     *           "method": "submit"
                      *         },
                      *         {
                      *           "step": "verify-pan",
@@ -9612,43 +9768,50 @@ export interface operations {
                      *             "business_type",
                      *             "pan"
                      *           ],
-                     *           "cooldown": false
+                     *           "cooldown": false,
+                     *           "method": "submit"
                      *         },
                      *         {
                      *           "step": "aadhaar-otp",
                      *           "required": [
                      *             "aadhaar"
                      *           ],
-                     *           "cooldown": true
+                     *           "cooldown": true,
+                     *           "method": "otp"
                      *         },
                      *         {
                      *           "step": "aadhaar-verify",
                      *           "required": [
                      *             "otp"
                      *           ],
-                     *           "cooldown": true
+                     *           "cooldown": true,
+                     *           "method": "otp"
                      *         },
                      *         {
                      *           "step": "verify-gst",
                      *           "required": [
                      *             "gst"
                      *           ],
-                     *           "cooldown": false
+                     *           "cooldown": false,
+                     *           "method": "submit"
                      *         },
                      *         {
                      *           "step": "skip-gst",
                      *           "required": [],
-                     *           "cooldown": false
+                     *           "cooldown": false,
+                     *           "method": "submit"
                      *         },
                      *         {
                      *           "step": "preview",
                      *           "required": [],
-                     *           "cooldown": false
+                     *           "cooldown": false,
+                     *           "method": "submit"
                      *         },
                      *         {
                      *           "step": "accept",
                      *           "required": [],
-                     *           "cooldown": false
+                     *           "cooldown": false,
+                     *           "method": "submit"
                      *         }
                      *       ]
                      *     }
@@ -9658,12 +9821,41 @@ export interface operations {
                         /** @enum {string} */
                         region?: "IN" | "US";
                         steps?: {
-                            /** @enum {string} */
-                            step?: "register" | "verify-otp" | "resend-otp" | "verify-pan" | "aadhaar-otp" | "aadhaar-verify" | "verify-gst" | "skip-gst" | "preview" | "accept";
-                            /** @description Body fields this step requires, beyond `user_id` and `region`. */
+                            /**
+                             * @description The step name to pass in the path. Not a fixed
+                             *     list: carriers do not run the same checks, so
+                             *     read the names from this response rather than
+                             *     hard-coding them.
+                             */
+                            step?: string;
+                            /** @description Body fields this step requires, beyond `user_id`, `region`, and `carrier`. */
                             required?: string[];
                             /** @description Whether this step is rate-limited. When true, wait about 30 seconds between attempts. */
                             cooldown?: boolean;
+                            /**
+                             * @description Fixed vocabularies, per field, for the fields that
+                             *     have one. Build your control from this rather than
+                             *     hard-coding the values: sending anything outside a
+                             *     published list is refused with `400
+                             *     invalid_request` naming what is allowed. `{}` when
+                             *     the step has no such field.
+                             */
+                            choices?: {
+                                [key: string]: string[];
+                            };
+                            /**
+                             * @description How to perform this step.
+                             *
+                             *     `submit` posts the `required` fields. `otp` posts
+                             *     a code the customer received. `redirect` returns a
+                             *     `redirect_url` for the customer to open in their
+                             *     own browser, after which you poll `poll_step`.
+                             *
+                             *     Branch on this, not on the region or the step
+                             *     name, and one integration drives every carrier.
+                             * @enum {string}
+                             */
+                            method?: "submit" | "otp" | "redirect";
                         }[];
                     };
                 };
@@ -9690,19 +9882,54 @@ export interface operations {
                     "application/json": components["schemas"]["SessionError"];
                 };
             };
-            /** @description No verification flow is configured for this region. */
+            /**
+             * @description No verification flow is configured for this region
+             *     (`not_available`), or the request named a carrier the region
+             *     does not have (`unknown_carrier`).
+             */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionError"];
+                };
+            };
+            /**
+             * @description This region has more than one carrier and the request named
+             *     none. The body lists the carriers to choose from.
+             */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     /**
                      * @example {
-                     *       "error": "not_available",
-                     *       "error_description": "Verification is not available for this region."
+                     *       "error": "carrier_required",
+                     *       "error_description": "Region IN has more than one carrier and no default. Pass carrier=<name> with one of the carriers listed here.",
+                     *       "region": "IN",
+                     *       "carriers": [
+                     *         {
+                     *           "carrier": "carrier-1",
+                     *           "label": "Carrier 1",
+                     *           "description": "Landline numbers, 80 series.",
+                     *           "kyc_required": true,
+                     *           "unavailable": false,
+                     *           "unavailable_note": null
+                     *         },
+                     *         {
+                     *           "carrier": "carrier-2-new",
+                     *           "label": "Carrier 2 (new)",
+                     *           "description": "Mobile numbers, 94 and 79 series.",
+                     *           "kyc_required": true,
+                     *           "unavailable": false,
+                     *           "unavailable_note": null
+                     *         }
+                     *       ]
                      *     }
                      */
-                    "application/json": components["schemas"]["SessionError"];
+                    "application/json": components["schemas"]["CarrierRequiredError"];
                 };
             };
             /** @description Unexpected server error. */
@@ -9731,8 +9958,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description The verification step to run. */
-                step: "register" | "verify-otp" | "resend-otp" | "verify-pan" | "aadhaar-otp" | "aadhaar-verify" | "verify-gst" | "skip-gst" | "preview" | "accept";
+                /**
+                 * @description The verification step to run.
+                 *
+                 *     Not a fixed list. Carriers do not run the same checks, so take
+                 *     the names from `GET /reseller/kyc/requirements` for the carrier
+                 *     you are working in rather than hard-coding them.
+                 */
+                step: string;
             };
             cookie?: never;
         };
@@ -9756,6 +9989,13 @@ export interface operations {
                      */
                     region: "IN" | "US";
                     /**
+                     * @description The carrier to verify on. Optional while a region has
+                     *     one, required once it has two. Verification is per
+                     *     carrier, so this decides which flow the client walks.
+                     * @example carrier-1
+                     */
+                    carrier?: string;
+                    /**
                      * @description Customer's full name. Required for `register`.
                      * @example Demo User
                      */
@@ -9778,10 +10018,13 @@ export interface operations {
                     /** @description Customer's PAN. Required for `verify-pan`. */
                     pan?: string;
                     /**
-                     * @description Customer's business type. Required for `verify-pan`.
-                     * @enum {string}
+                     * @description The customer's business type. Required on the PAN step of
+                     *     the India carriers and on the business-details step of the
+                     *     US carrier, and the accepted values differ between them.
+                     *     Read them from `choices` on the requirements response
+                     *     rather than assuming a list.
                      */
-                    business_type?: "proprietorship" | "company" | "firm";
+                    business_type?: string;
                     /**
                      * @description Customer's Aadhaar number. Required for `aadhaar-otp`.
                      *     Rate limited to one attempt roughly every 30 seconds.
@@ -9795,6 +10038,115 @@ export interface operations {
                     otp?: string;
                     /** @description Customer's GST number. Required for `verify-gst`. */
                     gst?: string;
+                    /**
+                     * @description Required for `register` on carriers that register at
+                     *     district level, and for the US carrier's business address
+                     *     step (where it is the two-letter state code).
+                     * @example Gujarat
+                     */
+                    state?: string;
+                    /**
+                     * @description Customer's district. Required for `register` on carriers
+                     *     that register at district level, and validated against
+                     *     the state, so a district that does not belong to it is
+                     *     rejected with nothing written.
+                     * @example Surat
+                     */
+                    district?: string;
+                    /**
+                     * @description Customer's postal code. Required for `register` on carriers that register at district level.
+                     * @example 395003
+                     */
+                    pincode?: string;
+                    /**
+                     * @description Name exactly as it appears on the PAN. Required for
+                     *     `verify-pan` on carriers that check the name against the
+                     *     PAN record.
+                     * @example Demo User
+                     */
+                    pan_holder_name?: string;
+                    /**
+                     * @description Optional on `register`, defaults to `individual`. Fixed
+                     *     at registration and not changeable afterwards, and only
+                     *     a business account can verify GST.
+                     * @enum {string}
+                     */
+                    account_type?: "individual" | "business";
+                    /**
+                     * @description Trading name. Optional alongside a business `account_type`
+                     *     on the India carriers, required on the US carrier's
+                     *     business-details step.
+                     */
+                    business_name?: string;
+                    /**
+                     * @description How the business relates to its end customers. Required on
+                     *     the US carrier's business-details step; values come from
+                     *     `choices`.
+                     */
+                    business_identity?: string;
+                    /**
+                     * @description The industry the business operates in. Required on the US
+                     *     carrier's business-details step; values come from
+                     *     `choices`.
+                     */
+                    business_industry?: string;
+                    /**
+                     * @description The business's tax registration number. Required on the US carrier's business-details step.
+                     * @example 12-3456789
+                     */
+                    ein?: string;
+                    /**
+                     * @description The business's public website. Required on the US carrier's business-details step.
+                     * @example https://demo.example
+                     */
+                    website_url?: string;
+                    /**
+                     * @description Where the business operates. Optional on the US carrier's
+                     *     business-details step, defaults to USA and Canada; values
+                     *     come from `choices`.
+                     */
+                    regions_of_operation?: string;
+                    /**
+                     * @description Street address. Required on the US carrier's business-address step.
+                     * @example 1 Demo Street
+                     */
+                    street?: string;
+                    /**
+                     * @description City. Required on the US carrier's business-address step.
+                     * @example Springfield
+                     */
+                    city?: string;
+                    /**
+                     * @description Postal code. Required on the US carrier's business-address step.
+                     * @example 62701
+                     */
+                    postal_code?: string;
+                    /**
+                     * @description Two-letter country code. Optional on the US carrier's business-address step, defaults to US.
+                     * @example US
+                     */
+                    country?: string;
+                    /**
+                     * @description The authorized representative's first name. Required on the US carrier's representative step.
+                     * @example Demo
+                     */
+                    first_name?: string;
+                    /**
+                     * @description The authorized representative's last name. Required on the US carrier's representative step.
+                     * @example User
+                     */
+                    last_name?: string;
+                    /**
+                     * @description The representative's job title, as free text. Required on the US carrier's representative step.
+                     * @example Head of Operations
+                     */
+                    business_title?: string;
+                    /**
+                     * @description The representative's role, from a fixed list. Required on
+                     *     the US carrier's representative step; values come from
+                     *     `choices`.
+                     */
+                    job_position?: string;
                 };
             };
         };
@@ -9820,10 +10172,39 @@ export interface operations {
                          */
                         status?: string;
                         /**
-                         * @description The step to run next. Chain to it without re-reading status. `null` once verification is complete.
-                         * @enum {string|null}
+                         * @description The step to run next. Chain to it without re-reading
+                         *     status. `null` once there is nothing left for you to do.
+                         *
+                         *     Not a fixed list: which steps exist depends on the
+                         *     carrier. Follow this field and the step list from
+                         *     `/reseller/kyc/requirements`.
                          */
-                        next_step?: "register" | "verify-otp" | "verify-pan" | "aadhaar-otp" | "aadhaar-verify" | "verify-gst" | "preview" | "accept" | null;
+                        next_step?: string | null;
+                        /**
+                         * @description Echoes how the step that just ran is performed. Present
+                         *     on every step response.
+                         * @enum {string}
+                         */
+                        method?: "submit" | "otp" | "redirect";
+                        /**
+                         * @description Only on a `redirect` step. Send your customer to this
+                         *     link in their own browser, then poll `poll_step`.
+                         *
+                         *     **Single use.** It expires within minutes and must not
+                         *     be stored or reused. Call the step again for a new one:
+                         *     repeating it is safe and always returns a fresh link.
+                         */
+                        redirect_url?: string | null;
+                        /**
+                         * @description Only on a `redirect` step, and always `false`. Stated
+                         *     as a field so a client library can enforce it.
+                         */
+                        reusable?: boolean | null;
+                        /**
+                         * @description Only on a `redirect` step. The step to call, repeatedly,
+                         *     to find out whether the customer finished.
+                         */
+                        poll_step?: string | null;
                         /** @description Human-readable confirmation for the step that just ran. */
                         message?: string;
                         /** @description Present only in the response to the `preview` step. */
@@ -9909,18 +10290,16 @@ export interface operations {
                     "application/json": components["schemas"]["SessionError"];
                 };
             };
-            /** @description This step was called before its prerequisite step was completed. */
+            /**
+             * @description The step was called before its prerequisite step was completed
+             *     (`step_order`), or the region has more than one carrier and the
+             *     request named none (`carrier_required`).
+             */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    /**
-                     * @example {
-                     *       "error": "step_order",
-                     *       "error_description": "Complete the contact verification (OTP) step first."
-                     *     }
-                     */
                     "application/json": components["schemas"]["SessionError"];
                 };
             };
