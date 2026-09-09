@@ -38,11 +38,18 @@ jobs:
       # Trusted publishing authenticates with the job's OIDC identity, so no
       # npm token is involved. It needs Node >= 22.14 and npm >= 11.5.1,
       # which no Node line bundles yet.
+      #
+      # No registry-url on purpose. It makes setup-node write an .npmrc with
+      # _authToken=${NODE_AUTH_TOKEN}, and with no secret to fill it that
+      # resolves to setup-node's literal placeholder. npm then publishes with
+      # a junk token and the registry answers 404, which reads as "no such
+      # package" and hides the real problem. Without it, a missing trusted
+      # publisher fails as ENEEDAUTH, which says what is actually wrong.
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-          registry-url: https://registry.npmjs.org
       - run: npm install -g npm@latest
+      - run: npm --version && node --version
       - run: npm ci
       - run: npm run build
       - run: npm test
