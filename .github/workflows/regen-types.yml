@@ -1,10 +1,17 @@
 name: regen-types
 
-# Watches the upstream OpenAPI spec. When it changes, regenerates the
-# committed types and opens a PR. Keeps src/generated/types.ts in sync
-# with the API without a human transcribing anything.
+# Keeps src/generated/types.ts in sync with the published OpenAPI spec:
+# regenerates, then opens a PR. Nobody transcribes anything by hand.
+#
+# omnidim-docs now dispatches here the moment the spec merges, so the normal
+# path is minutes rather than up to a day. The cron stays as a backstop for a
+# missed dispatch, but it cannot be the primary path: GitHub disables a
+# scheduled workflow after 60 days without activity in a public repo, which
+# would switch this off in exactly the quiet stretch nobody is watching.
 
 on:
+  repository_dispatch:
+    types: [spec-changed]
   workflow_dispatch:
   schedule:
     - cron: "0 5 * * *"
@@ -24,9 +31,20 @@ jobs:
       - run: npm ci
       - run: npm run regen
       - run: npm run typecheck
+      # The PR is opened as the app, not with GITHUB_TOKEN. GitHub will not
+      # start a workflow from an event the repository's own token created, so
+      # a PR opened with GITHUB_TOKEN arrives with no CI on it, which defeats
+      # the point of a PR somebody is meant to review.
+      - name: Mint an installation token
+        id: token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.SPEC_BOT_APP_ID }}
+          private-key: ${{ secrets.SPEC_BOT_PRIVATE_KEY }}
       - name: Open PR if the spec changed
         uses: peter-evans/create-pull-request@v8
         with:
+          token: ${{ steps.token.outputs.token }}
           commit-message: "chore: regenerate types from updated OpenAPI spec"
           branch: chore/regen-types
           delete-branch: true
