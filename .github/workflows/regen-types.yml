@@ -22,8 +22,8 @@ jobs:
       pull-requests: write
       issues: write
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
@@ -39,7 +39,7 @@ jobs:
       # GITHUB_TOKEN PR would arrive with no checks on it.
       - name: Mint an installation token
         id: token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           # Inlined: an app id is public and useless without the key, and a
           # missing variable fails as "appId option is required".
@@ -83,7 +83,7 @@ jobs:
       # first place. One issue, reused until it is closed.
       - name: Open an issue if the regen never produced a PR
         if: failure()
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const existing = await github.rest.issues.listForRepo({
