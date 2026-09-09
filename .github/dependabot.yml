@@ -19,6 +19,12 @@ updates:
       npm-major:
         patterns: ["*"]
         update-types: [major]
+    ignore:
+      # openapi-typescript declares `peer typescript@"^5.x"`, so TypeScript 7
+      # cannot be installed here at all: `npm ci` fails on the peer conflict
+      # before any code is compiled. Revisit when openapi-typescript accepts 7.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
