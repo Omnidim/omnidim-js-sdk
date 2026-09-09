@@ -71,6 +71,19 @@ const cases: [string, (c: any) => Promise<unknown>, string, string][] = [
   ["reseller.transferCredits", (c) => c.reseller.transferCredits(B), "POST", "/reseller/credits/transfer"],
   ["reseller.revertCredits", (c) => c.reseller.revertCredits(B), "POST", "/reseller/credits/revert"],
   ["reseller.creditLogs", (c) => c.reseller.creditLogs(), "GET", "/reseller/credits/logs"],
+  ["reseller.kycStatus", (c) => c.reseller.kycStatus({ user_id: ID }), "GET", "/reseller/kyc/status?user_id=7"],
+  [
+    "reseller.kycRequirements",
+    (c) => c.reseller.kycRequirements({ region: "IN", carrier: "carrier-1" }),
+    "GET",
+    "/reseller/kyc/requirements?region=IN&carrier=carrier-1",
+  ],
+  [
+    "reseller.submitKycStep",
+    (c) => c.reseller.submitKycStep("aadhaar-otp", B),
+    "POST",
+    "/reseller/kyc/steps/aadhaar-otp",
+  ],
   ["integrations.list", (c) => c.integrations.list(), "GET", "/integrations"],
   ["integrations.listForAgent", (c) => c.integrations.listForAgent(ID), "GET", "/agents/7/integrations"],
   ["integrations.createCustomApi", (c) => c.integrations.createCustomApi(B), "POST", "/integrations/custom-api"],
@@ -81,7 +94,7 @@ const cases: [string, (c: any) => Promise<unknown>, string, string][] = [
 
 describe("resource routing", () => {
   it("covers all resource methods", () => {
-    expect(cases).toHaveLength(56);
+    expect(cases).toHaveLength(59);
   });
 
   for (const [name, call, method, path] of cases) {
