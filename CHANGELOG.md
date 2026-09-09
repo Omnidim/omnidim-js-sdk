@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-09
+
 ### Added
 
 - Ten bulk-call methods on `client.bulkCalls`: `listLines`, `start`, `addContact`, `addContacts`, `setConcurrency`, `setDailyTimeControl`, `retry`, `listNumbers`, `addNumber`, and `setNumberActive`. Everything past creating a campaign was previously unreachable from TypeScript, so a campaign could be created but not started, fed, throttled, or retried.
