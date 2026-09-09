@@ -41,6 +41,26 @@ const cases: [string, (c: any) => Promise<unknown>, string, string][] = [
   ["bulkCalls.action", (c) => c.bulkCalls.action(ID, B), "PUT", "/calls/bulk_call/7"],
   ["bulkCalls.cancel", (c) => c.bulkCalls.cancel(ID), "DELETE", "/calls/bulk_call/7"],
   ["bulkCalls.liveStatus", (c) => c.bulkCalls.liveStatus(ID), "GET", "/bulk-call/7/live-status"],
+  ["bulkCalls.listLines", (c) => c.bulkCalls.listLines(ID), "GET", "/calls/bulk_call/7/lines"],
+  ["bulkCalls.start", (c) => c.bulkCalls.start(ID), "POST", "/calls/bulk_call/7/start"],
+  ["bulkCalls.addContact", (c) => c.bulkCalls.addContact(ID, B), "POST", "/calls/bulk_call/7/add_contact"],
+  ["bulkCalls.addContacts", (c) => c.bulkCalls.addContacts(ID, B), "POST", "/calls/bulk_call/7/add_contacts"],
+  ["bulkCalls.setConcurrency", (c) => c.bulkCalls.setConcurrency(ID, B), "PUT", "/calls/bulk_call/7/concurrency"],
+  [
+    "bulkCalls.setDailyTimeControl",
+    (c) => c.bulkCalls.setDailyTimeControl(ID, B),
+    "PUT",
+    "/calls/bulk_call/7/daily-time-control",
+  ],
+  ["bulkCalls.retry", (c) => c.bulkCalls.retry(ID), "POST", "/calls/bulk_call/7/manual_retry"],
+  ["bulkCalls.listNumbers", (c) => c.bulkCalls.listNumbers(ID), "GET", "/calls/bulk_call/7/numbers"],
+  ["bulkCalls.addNumber", (c) => c.bulkCalls.addNumber(ID, B), "POST", "/calls/bulk_call/7/numbers"],
+  [
+    "bulkCalls.setNumberActive",
+    (c) => c.bulkCalls.setNumberActive(ID, 3, B),
+    "PUT",
+    "/calls/bulk_call/7/numbers/3",
+  ],
   ["knowledgeBase.list", (c) => c.knowledgeBase.list(), "GET", "/knowledge_base/list"],
   ["knowledgeBase.canUpload", (c) => c.knowledgeBase.canUpload(B), "POST", "/knowledge_base/can_upload"],
   ["knowledgeBase.upload", (c) => c.knowledgeBase.upload(B), "POST", "/knowledge_base/create"],
@@ -94,7 +114,7 @@ const cases: [string, (c: any) => Promise<unknown>, string, string][] = [
 
 describe("resource routing", () => {
   it("covers all resource methods", () => {
-    expect(cases).toHaveLength(59);
+    expect(cases).toHaveLength(69);
   });
 
   for (const [name, call, method, path] of cases) {
