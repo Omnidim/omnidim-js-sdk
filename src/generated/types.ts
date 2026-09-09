@@ -1480,7 +1480,7 @@ export interface paths {
          * @description Run one step of a client's identity verification. One endpoint handles
          *     every step: the `step` path parameter names the step, and the body
          *     carries `user_id`, `region`, `carrier`, and whatever that step needs.
-         *     Pick a step from the examples below to see its body.
+         *     The example below is the `register` step on `carrier-1`.
          *
          *     Which steps exist, which fields they need, and how each one is
          *     performed are all per carrier. Read them from the requirements
@@ -6077,18 +6077,10 @@ export interface operations {
                  */
                 region: "IN" | "US";
                 /**
-                 * @description Which carrier to use. **Always required** in a region that has
-                 *     one, however few it holds, so that adding a carrier is never a
-                 *     breaking change.
-                 *
-                 *     Region `IN` has two: `carrier-1` stocks landline numbers (city
-                 *     codes 11, 12 and 80), `carrier-2-new` stocks mobile numbers (94
-                 *     and 79 series). Region `US` has one: `carrier-us`, US local
-                 *     numbers by area code.
-                 *
-                 *     Omitting it returns `409 carrier_required` listing the carriers
-                 *     with what each one stocks, so an integration can discover them at
-                 *     runtime rather than hard-coding this list.
+                 * @description Which carrier's stock to search: carriers in a region do not sell
+                 *     the same numbers. Always required, even where a region holds one,
+                 *     and omitting it returns `409 carrier_required` naming that
+                 *     region's carriers and what each one stocks.
                  * @example carrier-1
                  */
                 carrier: string;
@@ -6309,9 +6301,8 @@ export interface operations {
                     /**
                      * @description The carrier to buy from: pass the `carrier` the search
                      *     response named, so you buy from the inventory you searched.
-                     *     Always required. Region `IN` has `carrier-1` (landline) and
-                     *     `carrier-2-new` (mobile); region `US` has `carrier-us`.
-                     *     Omitting it returns `409 carrier_required` listing them.
+                     *     Always required, and omitting it returns
+                     *     `409 carrier_required` naming that region's carriers.
                      * @example carrier-1
                      */
                     carrier: string;
@@ -9323,11 +9314,8 @@ export interface operations {
             content: {
                 /**
                  * @example {
-                 *       "user_id": 1234,
-                 *       "region": "IN",
-                 *       "name": "Demo User",
-                 *       "email": "demo@example.com",
-                 *       "phone": "+919876543210"
+                 *       "minutes": 100,
+                 *       "cost_per_min": 0.2
                  *     }
                  */
                 "application/json": {
@@ -9726,21 +9714,10 @@ export interface operations {
                  */
                 region: "IN" | "US";
                 /**
-                 * @description Which carrier's verification steps to return. Carriers in the same
-                 *     region do not share a step list, so this decides the answer.
-                 *
-                 *     Which carrier to use. **Always required** in a region that has
-                 *     one, however few it holds, so that adding a carrier is never a
-                 *     breaking change.
-                 *
-                 *     Region `IN` has two: `carrier-1` stocks landline numbers (city
-                 *     codes 11, 12 and 80), `carrier-2-new` stocks mobile numbers (94
-                 *     and 79 series). Region `US` has one: `carrier-us`, US local
-                 *     numbers by area code.
-                 *
-                 *     Omitting it returns `409 carrier_required` listing the carriers
-                 *     with what each one stocks, so an integration can discover them at
-                 *     runtime rather than hard-coding this list.
+                 * @description Which carrier's steps to return: carriers in a region do not share
+                 *     a step list. Always required, even where a region holds one, and
+                 *     omitting it returns `409 carrier_required` naming that region's
+                 *     carriers.
                  * @example carrier-1
                  */
                 carrier: string;
@@ -9985,11 +9962,9 @@ export interface operations {
             header?: never;
             path: {
                 /**
-                 * @description The verification step to run.
-                 *
-                 *     Not a fixed list. Carriers do not run the same checks, so take
-                 *     the names from `GET /reseller/kyc/requirements` for the carrier
-                 *     you are working in rather than hard-coding them.
+                 * @description The verification step to run. Not a fixed list: carriers do not run
+                 *     the same checks, so take the names from
+                 *     `GET /reseller/kyc/requirements` for the carrier you are on.
                  */
                 step: string;
             };
@@ -10001,6 +9976,7 @@ export interface operations {
                  * @example {
                  *       "user_id": 1234,
                  *       "region": "IN",
+                 *       "carrier": "carrier-1",
                  *       "name": "Demo User",
                  *       "email": "demo@example.com",
                  *       "phone": "+919876543210"
@@ -10015,13 +9991,10 @@ export interface operations {
                      */
                     region: "IN" | "US";
                     /**
-                     * @description The carrier to verify on. Always required. Verification is
-                     *     per carrier, so this decides which flow the client walks
-                     *     and which record it writes: region `IN` has `carrier-1`
-                     *     (OTP pair, then Aadhaar by OTP) and `carrier-2-new` (no
-                     *     OTP, Aadhaar by DigiLocker link); region `US` has
-                     *     `carrier-us` (business verification). Omitting it returns
-                     *     `409 carrier_required` listing them.
+                     * @description The carrier to verify on: verification is per carrier, so
+                     *     this decides which flow the client walks and which record
+                     *     it writes. Always required, and omitting it returns
+                     *     `409 carrier_required` naming that region's carriers.
                      * @example carrier-1
                      */
                     carrier: string;
