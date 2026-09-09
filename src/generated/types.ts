@@ -6077,11 +6077,21 @@ export interface operations {
                  */
                 region: "IN" | "US";
                 /**
-                 * @description Which carrier to search. Optional while a region has one,
-                 *     required once it has two, and the refusal lists the names.
+                 * @description Which carrier to use. **Always required** in a region that has
+                 *     one, however few it holds, so that adding a carrier is never a
+                 *     breaking change.
+                 *
+                 *     Region `IN` has two: `carrier-1` stocks landline numbers (city
+                 *     codes 11, 12 and 80), `carrier-2-new` stocks mobile numbers (94
+                 *     and 79 series). Region `US` has one: `carrier-us`, US local
+                 *     numbers by area code.
+                 *
+                 *     Omitting it returns `409 carrier_required` listing the carriers
+                 *     with what each one stocks, so an integration can discover them at
+                 *     runtime rather than hard-coding this list.
                  * @example carrier-1
                  */
-                carrier?: string;
+                carrier: string;
                 /**
                  * @description Digits or prefix to match within the number.
                  * @example 555
@@ -6297,11 +6307,14 @@ export interface operations {
                      */
                     phone_number: string;
                     /**
-                     * @description The carrier to buy from, as named by the search response.
-                     *     Optional while a region has one, required once it has two.
+                     * @description The carrier to buy from: pass the `carrier` the search
+                     *     response named, so you buy from the inventory you searched.
+                     *     Always required. Region `IN` has `carrier-1` (landline) and
+                     *     `carrier-2-new` (mobile); region `US` has `carrier-us`.
+                     *     Omitting it returns `409 carrier_required` listing them.
                      * @example carrier-1
                      */
-                    carrier?: string;
+                    carrier: string;
                     /** @description Reseller accounts only: the client to act on. Omit it to act on your own account. */
                     user_id?: number;
                 };
@@ -9713,11 +9726,24 @@ export interface operations {
                  */
                 region: "IN" | "US";
                 /**
-                 * @description Which carrier's steps to return. Optional while a region has
-                 *     one, required once it has two, and the refusal lists the names.
+                 * @description Which carrier's verification steps to return. Carriers in the same
+                 *     region do not share a step list, so this decides the answer.
+                 *
+                 *     Which carrier to use. **Always required** in a region that has
+                 *     one, however few it holds, so that adding a carrier is never a
+                 *     breaking change.
+                 *
+                 *     Region `IN` has two: `carrier-1` stocks landline numbers (city
+                 *     codes 11, 12 and 80), `carrier-2-new` stocks mobile numbers (94
+                 *     and 79 series). Region `US` has one: `carrier-us`, US local
+                 *     numbers by area code.
+                 *
+                 *     Omitting it returns `409 carrier_required` listing the carriers
+                 *     with what each one stocks, so an integration can discover them at
+                 *     runtime rather than hard-coding this list.
                  * @example carrier-1
                  */
-                carrier?: string;
+                carrier: string;
             };
             header?: never;
             path?: never;
@@ -9989,12 +10015,16 @@ export interface operations {
                      */
                     region: "IN" | "US";
                     /**
-                     * @description The carrier to verify on. Optional while a region has
-                     *     one, required once it has two. Verification is per
-                     *     carrier, so this decides which flow the client walks.
+                     * @description The carrier to verify on. Always required. Verification is
+                     *     per carrier, so this decides which flow the client walks
+                     *     and which record it writes: region `IN` has `carrier-1`
+                     *     (OTP pair, then Aadhaar by OTP) and `carrier-2-new` (no
+                     *     OTP, Aadhaar by DigiLocker link); region `US` has
+                     *     `carrier-us` (business verification). Omitting it returns
+                     *     `409 carrier_required` listing them.
                      * @example carrier-1
                      */
-                    carrier?: string;
+                    carrier: string;
                     /**
                      * @description Customer's full name. Required for `register`.
                      * @example Demo User
@@ -10066,15 +10096,18 @@ export interface operations {
                      */
                     pan_holder_name?: string;
                     /**
-                     * @description Optional on `register`, defaults to `individual`. Fixed
-                     *     at registration and not changeable afterwards, and only
-                     *     a business account can verify GST.
-                     * @enum {string}
+                     * @description Optional on `register`, defaults to `individual`. **Fixed
+                     *     at registration and not changeable afterwards**, and only a
+                     *     business account can verify GST, so send it deliberately.
+                     *     Accepted values come from `choices` on the requirements
+                     *     response; anything else is refused with `400
+                     *     invalid_request` rather than quietly registered as an
+                     *     individual.
                      */
-                    account_type?: "individual" | "business";
+                    account_type?: string;
                     /**
-                     * @description Trading name. Optional alongside a business `account_type`
-                     *     on the India carriers, required on the US carrier's
+                     * @description Trading name. Required when `account_type` is `business`
+                     *     on the India carriers, and required on the US carrier's
                      *     business-details step.
                      */
                     business_name?: string;
