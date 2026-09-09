@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-09
+
+### Added
+
+- Reseller identity verification on `client.reseller`: `kycStatus`, `kycRequirements`, and `submitKycStep`. The generated types for these operations already shipped; the methods did not, so a TypeScript integration could create a client and fund it but could not verify one, which is the step between those and buying a number.
+
+### Changed
+
+- `carrier` is now required on number search, number purchase, and every verification step, matching the published API. Code that omitted it compiled before and no longer does, which is the point: the server refuses those calls with `409 carrier_required`.
+
 ## [0.4.2] - 2026-09-03
 
 ### Added
