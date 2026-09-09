@@ -52,7 +52,7 @@
     "node": ">=20.0.0"
   },
   "devDependencies": {
-    "@types/node": "^25.9.1",
+    "@types/node": "^26.4.1",
     "@vitest/coverage-v8": "^5.0.0",
     "openapi-typescript": "^7.4.0",
     "typescript": "^5.9.3",
