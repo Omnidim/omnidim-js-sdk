@@ -1,13 +1,11 @@
 name: regen-types
 
-# Keeps src/generated/types.ts in sync with the published OpenAPI spec:
-# regenerates, then opens a PR. Nobody transcribes anything by hand.
+# Regenerates src/generated/types.ts from the published OpenAPI spec and opens
+# a PR when it changes.
 #
-# omnidim-docs now dispatches here the moment the spec merges, so the normal
-# path is minutes rather than up to a day. The cron stays as a backstop for a
-# missed dispatch, but it cannot be the primary path: GitHub disables a
-# scheduled workflow after 60 days without activity in a public repo, which
-# would switch this off in exactly the quiet stretch nobody is watching.
+# The spec repo dispatches on merge, so that is the normal path. The cron is a
+# backstop: GitHub disables a scheduled workflow after 60 days without repo
+# activity, so it cannot be the only trigger.
 
 on:
   repository_dispatch:
@@ -31,10 +29,9 @@ jobs:
       - run: npm ci
       - run: npm run regen
       - run: npm run typecheck
-      # The PR is opened as the app, not with GITHUB_TOKEN. GitHub will not
-      # start a workflow from an event the repository's own token created, so
-      # a PR opened with GITHUB_TOKEN arrives with no CI on it, which defeats
-      # the point of a PR somebody is meant to review.
+      # Opened as the app, not with GITHUB_TOKEN: GitHub does not start a
+      # workflow from an event the repository's own token created, so a
+      # GITHUB_TOKEN PR would arrive with no checks on it.
       - name: Mint an installation token
         id: token
         uses: actions/create-github-app-token@v2
