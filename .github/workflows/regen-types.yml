@@ -36,7 +36,9 @@ jobs:
         id: token
         uses: actions/create-github-app-token@v2
         with:
-          app-id: ${{ vars.SPEC_BOT_APP_ID }}
+          # Inlined: an app id is public and useless without the key, and a
+          # missing variable fails as "appId option is required".
+          app-id: "4881703"
           private-key: ${{ secrets.SPEC_BOT_PRIVATE_KEY }}
       - name: Open PR if the spec changed
         uses: peter-evans/create-pull-request@v8
