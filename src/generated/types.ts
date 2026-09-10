@@ -316,11 +316,11 @@ export interface paths {
          * Create bulk call
          * @description Create a new bulk-call campaign. Only name, phone_number_id and a
          *     contact_list are needed to dial a list now; every other field adds
-         *     one behaviour on top (drafts, rotation, filtering, scheduling,
+         *     one behavior on top (drafts, rotation, filtering, scheduling,
          *     retries, dynamic feeding).
          *
          *     The guide below the field reference walks the whole journey: the
-         *     first campaign and its response, each behaviour with a working
+         *     first campaign and its response, each behavior with a working
          *     request, every refusal message with its fix, and the endpoints that
          *     operate a campaign once it runs.
          */
@@ -1304,7 +1304,7 @@ export interface paths {
          *     the ceiling for your whole account family at dial time, so what you set
          *     here is a per-client cap, and your own limit is the capacity those caps
          *     compete for. Assign a client more than you hold and the extra simply
-         *     cannot be dialled.
+         *     cannot be dialed.
          */
         post: operations["setChildConcurrency"];
         delete?: never;
