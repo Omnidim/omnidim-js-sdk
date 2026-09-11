@@ -1662,6 +1662,7 @@ export interface components {
             is_first_ideal_message_dynamic?: boolean;
             is_second_ideal_message_dynamic?: boolean;
             is_transfer_enabled?: boolean;
+            /** @description Allow custom API integrations to transfer live calls. When enabled and a custom API response includes "__omni_transfer_number", the call is transferred to that number immediately. Optional "__omni_transfer_message" sets what the caller hears during the handover. */
             is_custom_api_transfer_enabled?: boolean;
             transfer_options?: {
                 number?: string;
